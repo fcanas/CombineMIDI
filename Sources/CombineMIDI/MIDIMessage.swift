@@ -2,34 +2,97 @@
 public enum MIDIMessage {
     
     public struct Note {
+        
+        private var bytes: [UInt8]
+        
+        init?(bytes: [UInt8]) {
+            guard
+                bytes.count == 3,
+                (bytes[0] & 0b1001_0000) == 0b1000_0000 || (bytes[0] & 0b1000_0000) == 0b1000_0000 // note on or note off
+            else {
+                return nil
+            }
+            self.init(on: (bytes[0] & 0b0001_0000) > 0,
+                      channel: bytes[0] & 0b0000_1111,
+                      noteNumber: bytes[1],
+                      velocity: bytes[2]
+            )
+        }
+        
+        public init(on: Bool,
+                    channel: UInt8,
+                    noteNumber: UInt8,
+                    velocity: UInt8
+        ) {
+            self.on = on
+            self.channel = channel
+            self.noteNumber = noteNumber
+            self.velocity = velocity
+            bytes = [ (on ? 0b1001_1111 : 0b1000_1111) & channel, noteNumber, velocity ]
+        }
+        public var on: Bool
         public var channel: UInt8
         public var noteNumber: UInt8
         public var velocity: UInt8
     }
     
     public struct PolyphonicAftertouch {
+        public init(channel: UInt8,
+                    noteNumber: UInt8,
+                    pressure: UInt8) {
+            self.channel = channel
+            self.noteNumber = noteNumber
+            self.pressure = pressure
+        }
         public var channel: UInt8
         public var noteNumber: UInt8
         public var pressure: UInt8
     }
     
     public struct ProgramChange {
+        public init(channel: UInt8,
+                    program: UInt8) {
+            self.channel = channel
+            self.program = program
+        }
         public var channel: UInt8
         public var program: UInt8
     }
     
     public struct ChannelAftertouch {
+        public init(channel: UInt8,
+                    pressureValue: UInt8) {
+            self.channel = channel
+            self.pressureValue = pressureValue
+        }
         public var channel: UInt8
         public var pressureValue: UInt8
     }
     
     public struct PitchBend {
+        public init(
+            channel: UInt8,
+            lsb: UInt8,
+            msb: UInt8) {
+                self.channel = channel
+                self.lsb = lsb
+                self.msb = msb
+            }
         public var channel: UInt8
         public var lsb: UInt8
         public var msb: UInt8
     }
     
     public struct ControlChange {
+        public init(
+            channel: UInt8,
+            control: UInt7,
+            controlValue: UInt8
+        ){
+            self.channel = channel
+            self.control = control
+            self.controlValue = controlValue
+        }
         public var channel: UInt8
         public var control: UInt7
         public var controlValue: UInt8
@@ -55,25 +118,25 @@ public enum MIDIMessage {
         /// Note Off event.
         /// This message is sent when a note is released (ended).
         case noteOff = 0x80
-
+        
         /// Note On event.
         /// This message is sent when a note is depressed (start).
         case noteOn = 0x90
-
+        
         /// Polyphonic Key Pressure (Aftertouch).
         /// This message is most often sent by pressing down on
         /// the key after it "bottoms out".
         case aftertouch = 0xA0
-
+        
         /// Control Change. This message is sent when a controller
         /// value changes. Controllers include devices such as
         /// pedals and levers.
         case controlChange = 0xB0
-
+        
         /// Program Change. This message sent when the patch
         /// number changes.
         case programChange = 0xC0
-
+        
         /// Channel Pressure (After-touch).
         /// This message is most often sent by pressing down on
         /// the key after it "bottoms out". This message is
@@ -81,7 +144,7 @@ public enum MIDIMessage {
         /// message to send the single greatest pressure value
         /// (of all the current depressed keys).
         case channelPressure = 0xD0
-
+        
         /// Pitch Bend Change. This message is sent to indicate
         /// a change in the pitch bender (wheel or lever, typically).
         /// The pitch bender is measured by a fourteen bit value.
@@ -95,18 +158,18 @@ public enum MIDIMessage {
         case activeSensing = 0xFE
         case systemReset = 0xFF
     }
-
+    
     /// All Notes Off. When an All Notes Off is received, all oscillators will turn off.
-    static let allNotesOff: MIDIMessage = .controlChange(ControlChange(channel: 0, control: 123, controlValue: 0))
-        
-
+    static let allNotesOff: MIDIMessage = .controlChange(ControlChange(channel: 0, control: UInt7(123), controlValue: 0))
+    
+    
     /// Initializes new message manually with all the parameters.
     /// - Parameters:
     ///   - status: Kind of the message.
     ///   - channel: Channel of the message. Between 0-15.
     ///   - data1: First data byte. Usually a key number (note or controller). Between 0-127.
     ///   - data2: Second data bytes. Usually a value (pressure, velocity or program number). Between 0-127.
-
+    
     /// Initializes new message automatically by parsing an array of bytes (usually from a MIDI packet).
     /// - Parameters:
     ///   - bytes: Array of bytes. At least three bytes must be supplied to create strongly-typed
@@ -122,9 +185,9 @@ public enum MIDIMessage {
         
         switch status {
         case .noteOff:
-            self = .noteOff(Note(channel: channel, noteNumber: data1, velocity: data2))
+            self = .noteOff(Note(on:false, channel: channel, noteNumber: data1, velocity: data2))
         case .noteOn:
-            self = .noteOn(Note(channel: channel, noteNumber: data1, velocity: data2))
+            self = .noteOn(Note(on:true, channel: channel, noteNumber: data1, velocity: data2))
         case .aftertouch:
             self = .afterTouch(PolyphonicAftertouch(channel: channel, noteNumber: data1, pressure: data2))
         case .controlChange:
